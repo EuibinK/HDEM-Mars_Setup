@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Script to fetch available DTM files from the HiRISE DTM archive and save details to a CSV file.
+# Usage: ./fetch_dtm_list.sh [output_file.csv]
+# Contact: euibin@lpl.arizona.edu
+
 set -e
 
 BASE_URL="https://www.uahirise.org/PDS/DTM"
