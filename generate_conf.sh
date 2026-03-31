@@ -6,7 +6,7 @@
 
 #############################################################################################
 # Set PATHs
-PATH_ROOT="/Users/euibin/Desktop/hdem-mars/"
+PATH_ROOT="/path/to/HDEM-Mars/"
 DATABASE_NAME="Database/Data_exp/BRDF_963A_olivine_sand_Hapke-RTLSR_HiRISE.nc"
 ATMOSPHERIC_LUT="Database/Data_atmos/LUT_derived_quantities_spectral_Wolff_V_highres.nc"
 #############################################################################################
