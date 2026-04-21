@@ -368,7 +368,9 @@ download_labels() {
 	URL_BW="https://hirise-pds.lpl.arizona.edu/PDS/RDR/${IMG_PREFIX}SP/ORB_${IMG_ORBIT_START}_${IMG_ORBIT_END}/${IMAGE_ID}/${IMAGE_ID}_RED.LBL"
 
 	# URL 2: Orthoimage label
-	URL_ORTHO="https://www.uahirise.org/PDS/DTM/${prefix1}SP/ORB_${ORBIT_START}_${ORBIT_END}/${IMAGE_ID1}_${IMAGE_ID2}/${IMAGE_ID}_RED_${institution}_${version}_ORTHO.LBL"
+	# Naming convention: {IMAGE_ID}_RED_{GRID_SPACING}_{SEQUENCE}_ORTHO.LBL
+	local BASE_ORTHO_URL="https://www.uahirise.org/PDS/DTM/${prefix1}SP/ORB_${ORBIT_START}_${ORBIT_END}/${IMAGE_ID1}_${IMAGE_ID2}"
+	local sequence="01"
 
 	echo ""
 	echo "2. Downloading LBL files..."
@@ -380,12 +382,20 @@ download_labels() {
 		BW_LABEL_FILE=""
 	fi
 
-	if curl -f -L -o "./${IMAGE_ID}_RED_${institution}_${version}_ORTHO.LBL" "$URL_ORTHO" 2>/dev/null; then
-		echo "  - Downloaded: ./${IMAGE_ID}_RED_${institution}_${version}_ORTHO.LBL"
-		ORTHO_LABEL_FILE="./${IMAGE_ID}_RED_${institution}_${version}_ORTHO.LBL"
-	else
-		echo "  - Failed to download Orthoimage label"
-		ORTHO_LABEL_FILE=""
+	# Try grid spacings A, B, C, D, E in order for orthoimage label
+	ORTHO_LABEL_FILE=""
+	for grid_spacing in A B C D E; do
+		local url_ortho="${BASE_ORTHO_URL}/${IMAGE_ID}_RED_${grid_spacing}_${sequence}_ORTHO.LBL"
+		local label_file="./${IMAGE_ID}_RED_${grid_spacing}_${sequence}_ORTHO.LBL"
+		if curl -f -L -o "$label_file" "$url_ortho" 2>/dev/null; then
+			echo "  - Downloaded: $label_file"
+			ORTHO_LABEL_FILE="$label_file"
+			break
+		fi
+	done
+
+	if [[ -z "$ORTHO_LABEL_FILE" ]]; then
+		echo "  - Failed to download Orthoimage label (tried grid spacings A, B, C, D, E)"
 	fi
 }
 

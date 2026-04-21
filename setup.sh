@@ -183,10 +183,14 @@ download_dem() {
 }
 
 # Download orthoimage from HiRISE PDS
+# Naming convention: {IMAGE_ID}_RED_{GRID_SPACING}_{SEQUENCE}_ORTHO.JP2
+#   GRID_SPACING: A=0.25m, B=0.5m, C=1.0m, D=2.0m
+#   SEQUENCE: typically 01
+# Outputs the downloaded filename to stdout
 download_orthoimage() {
 	local dem_base="$1"
 	local image_num="$2"
-	local output_file="$3"
+	local output_dir="$3"
 
 	parse_dem_name "$dem_base"
 
@@ -200,17 +204,30 @@ download_orthoimage() {
 		image_id="${IMAGE_ID2}"
 	fi
 
-	local url="https://www.uahirise.org/PDS/DTM/${PREFIX1}SP/ORB_${orbit_range}/${IMAGE_ID1}_${IMAGE_ID2}/${image_id}_RED_${INSTITUTION}_${VERSION}_ORTHO.JP2"
+	local base_url="https://www.uahirise.org/PDS/DTM/${PREFIX1}SP/ORB_${orbit_range}/${IMAGE_ID1}_${IMAGE_ID2}"
+	local sequence="01"
 
-	echo "      - Downloading orthoimage from: $url"
+	# Try grid spacings A, B, C, D, E in order
+	for grid_spacing in A B C D E; do
+		local filename="${image_id}_RED_${grid_spacing}_${sequence}_ORTHO.JP2"
+		local url="${base_url}/${filename}"
+		local output_file="${output_dir}/${filename}"
 
-	if curl -f -L --progress-bar -o "$output_file" "$url"; then
-		echo "      - Successfully downloaded orthoimage: $output_file"
-		return 0
-	else
-		echo "      - Error: Failed to download orthoimage from $url"
-		return 1
-	fi
+		# Check if file exists before downloading (silent check)
+		if curl -f -s -I "$url" >/dev/null 2>&1; then
+			echo "      - Downloading orthoimage (grid spacing ${grid_spacing})..." >&2
+			echo "        $url" >&2
+			if curl -f -L --progress-bar -o "$output_file" "$url"; then
+				echo "" >&2
+				echo "      - Successfully downloaded orthoimage: $output_file" >&2
+				echo "$output_file"
+				return 0
+			fi
+		fi
+	done
+
+	echo "      - Error: Failed to download orthoimage (tried grid spacings A, B, C, D, E)" >&2
+	return 1
 }
 
 # Convert IMG to TIF
@@ -373,18 +390,27 @@ ORTHO_PATH=""
 if [[ -n "$DOWNLOAD_IMAGE" ]]; then
 	echo "[4/6] Downloading orthoimage..."
 
+	# Build orthoimage base pattern for searching (try all grid spacings)
 	if [[ "$DOWNLOAD_IMAGE" == "1" ]]; then
-		ORTHO_BASE="${IMAGE_ID1}_RED_${INSTITUTION}_${VERSION}_ORTHO"
+		ORTHO_IMAGE_ID="${IMAGE_ID1}"
 	else
-		ORTHO_BASE="${IMAGE_ID2}_RED_${INSTITUTION}_${VERSION}_ORTHO"
+		ORTHO_IMAGE_ID="${IMAGE_ID2}"
 	fi
 
-	if ORTHO_PATH=$(find_ortho_file "." "$ORTHO_BASE") || ORTHO_PATH=$(find_ortho_file "./${DEM_BASE}" "$ORTHO_BASE"); then
-		echo "      - Orthoimage already exists: $ORTHO_PATH"
-	else
-		ORTHO_FILE="${ORTHO_BASE}.JP2"
-		if download_orthoimage "$DEM_BASE" "$DOWNLOAD_IMAGE" "./${ORTHO_FILE}"; then
-			ORTHO_PATH="./${ORTHO_FILE}"
+	# Check if orthoimage already exists (any grid spacing)
+	ORTHO_FOUND=false
+	for gs in A B C D E; do
+		ORTHO_BASE="${ORTHO_IMAGE_ID}_RED_${gs}_01_ORTHO"
+		if ORTHO_PATH=$(find_ortho_file "." "$ORTHO_BASE") || ORTHO_PATH=$(find_ortho_file "./${DEM_BASE}" "$ORTHO_BASE"); then
+			echo "      - Orthoimage already exists: $ORTHO_PATH"
+			ORTHO_FOUND=true
+			break
+		fi
+	done
+
+	if [[ "$ORTHO_FOUND" = false ]]; then
+		if ORTHO_PATH=$(download_orthoimage "$DEM_BASE" "$DOWNLOAD_IMAGE" "."); then
+			: # Success, ORTHO_PATH is set
 		else
 			echo "      - Failed to download orthoimage."
 			ORTHO_PATH=""
